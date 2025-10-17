@@ -9,6 +9,7 @@ export const ContentContainer = styled.div`
 
 export const UserVideoWrapper = styled.div`
   position: absolute;
+  top: 0; /* 헤더 바로 아래 */
   left: 0;
   width: 393px;
   height: 260px;
@@ -27,7 +28,7 @@ export const LiveVideo = styled.video`
 
 export const AvatarVideoWrapper = styled.div`
   position: absolute;
-  top: 260px;
+  top: 260px; /* 350px - 90px */
   left: 0;
   width: 393px;
   height: 260px;
@@ -47,7 +48,7 @@ export const AvatarImage = styled.img`
 
 export const EndRecordingButtonWrapper = styled.div`
   position: absolute;
-  top: 600px;
+  top: 600px; /* 690px - 90px */
   left: 50%;
   transform: translateX(-50%);
   width: 80px;

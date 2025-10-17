@@ -1,6 +1,8 @@
 // src/pages/JoinPage.styles.js
 import styled from 'styled-components';
 
+
+
 export const PageContainer = styled.div`
   width: 393px;
   min-height: 852px;

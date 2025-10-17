@@ -41,14 +41,12 @@ export const SectionContainer = styled.div`
   margin-top: 44px;
 `;
 
-// --- ↓↓↓ 이 부분을 텍스트 스타일에서 이미지 스타일로 변경합니다 ↓↓↓ ---
 export const SectionTitleIcon = styled.img`
   height: 24px;
   width: auto;
-  display: block; /* 이미지 아래 불필요한 여백 제거 */
-  margin-bottom: 15px; /* 아이콘과 박스 사이 간격 */
+  display: block;
+  margin-bottom: 15px;
 `;
-// --- ↑↑↑ 여기까지 ---
 
 export const ContentBox = styled.div`
   background-color: #F6F6F8;
@@ -57,6 +55,47 @@ export const ContentBox = styled.div`
   min-height: 120px;
   padding: 20px;
   box-sizing: border-box;
-  font-size: 14px; /* 폰트 크기를 14px로 줄입니다. */
+  font-size: 14px;
   color: #555;
+  
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* 각 요인 사이의 간격 */
+  }
 `;
+
+// --- ↓↓↓ 감정 요인 목록을 위한 스타일 추가 ↓↓↓ ---
+export const FactorListItem = styled.li`
+  display: flex;
+  flex-direction: column;
+`;
+
+export const FactorHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 아이콘과 이름 사이 간격 */
+  margin-bottom: 5px;
+`;
+
+export const FactorIcon = styled.img`
+  width: 24px;
+  height: 24px;
+`;
+
+export const FactorEmotionName = styled.span`
+  font-weight: bold;
+  font-size: 15px;
+  color: #333;
+`;
+
+export const FactorCause = styled.p`
+  font-size: 14px;
+  color: #555;
+  margin: 0;
+  padding-left: 32px; /* 아이콘 너비 + 간격 만큼 들여쓰기 */
+`;
+// --- ↑↑↑ 여기까지 ---
