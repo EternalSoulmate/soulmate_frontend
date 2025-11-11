@@ -13,6 +13,8 @@ import endRecordingButtonImg from '../assets/buttons/endrecordingbutton.svg';
 function RecordingPage() {
   const { date } = useParams();
   const navigate = useNavigate();
+
+  const [userId] = useState(() => localStorage.getItem('uuid') || 'b23cbc0e-d22b-4ce4-8178-f936f87a19c9');
   
   const videoRef = useRef(null);
   const socketRef = useRef(null);
@@ -82,9 +84,10 @@ function RecordingPage() {
 
     if (socketRef.current) {
       if (sessionIdRef.current) {
+        console.log(`[Socket] 'stop-video-stream' 이벤트 전송: sessionId=${sessionIdRef.current}, userId=${userId}`);
         socketRef.current.emit('stop-video-stream', { 
           sessionId: sessionIdRef.current, 
-          userId: 'temp-user', 
+          userId: userId, 
           reason: '사용자 요청' 
         });
       }
@@ -92,7 +95,7 @@ function RecordingPage() {
       socketRef.current = null;
     }
     sessionIdRef.current = null;
-  }, []);
+  }, [userId]);
 
   // --- 4. 영상 캡쳐 (이전과 동일) ---
   const startFrameCapture = useCallback(() => {
@@ -104,9 +107,10 @@ function RecordingPage() {
     
     sessionIdRef.current = 'session_' + Date.now();
     
-    socketRef.current.emit('start-video-stream', { 
+    console.log(`[Socket] 'start-video-stream' 이벤트 전송: sessionId=${sessionIdRef.current}, userId=${userId}`);
+    socketRef.current.emit('start-video-stream', {
       sessionId: sessionIdRef.current, 
-      userId: 'temp-user',
+      userId: userId,
       quality: { width: 640, height: 480, frameRate: 30, bitrate: 1000 },
       enableAudio: true,
       recordingEnabled: false,
@@ -129,7 +133,7 @@ function RecordingPage() {
       }
     }, 150);
     console.log('📹 영상 캡처 시작');
-  }, []);
+  }, [userId]);
 
   // --- 5. 음성 녹음 설정 (onstop 핸들러 추가) ---
   const setupAudioCapture = useCallback(() => {
@@ -159,10 +163,10 @@ function RecordingPage() {
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data.size > 100) { // 📍 100바이트 필터 (video-test.html과 동일)
           const reader = new FileReader();
           reader.onloadend = () => {
-            if (socketRef.current && socketRef.current.connected) {
+            if (socketRef.current && socketRef.current.connected && sessionIdRef.current) {
               const fullDataUrl = reader.result;
               const base64Prefix = 'base64,';
               const prefixIndex = fullDataUrl.indexOf(base64Prefix);
@@ -172,37 +176,43 @@ function RecordingPage() {
                 base64Audio = fullDataUrl.substring(prefixIndex + base64Prefix.length);
               } else {
                 base64Audio = fullDataUrl;
+                console.warn(`⚠️ data URL에서 'base64,' 프리픽스를 찾을 수 없어 전체를 base64로 사용합니다.`);
               }
               
               const audioFrameId = 'audio_' + Date.now() + '_' + audioSequenceRef.current;
               
-              console.log('🔊 서버로 10초 분량 음성 데이터 전송...');
+              console.debug(`[LATENCY] (0) Audio frame 전송 시작`); // 레이턴시 로그 추가
+              console.log(`🎤 클라이언트에서 'audio-frame' 전송 시도: ${audioFrameId}`);
               socketRef.current.emit('audio-frame', {
                 sessionId: sessionIdRef.current,
                 frameId: audioFrameId,
-                timestamp: Date.now(),
+                timestamp: Date.now(), 
                 audioData: base64Audio,
                 sequenceNumber: audioSequenceRef.current++,
                 format: 'webm'
               });
+              console.debug(`🎤 음성 프레임 전송: ${audioFrameId}`);
             }
           };
           reader.readAsDataURL(event.data);
         }
+        // 데이터를 보낸 후, 녹음기를 중지합니다. (파일 완결)
+        // onstop 핸들러가 이를 감지하고 재시작합니다.
+        mediaRecorderRef.current.stop();
       };
 
       recorder.onstop = () => {
-        // localStreamRef.current가 null이면(사용자가 '기록 끝'을 누름) 재시작하지 않음
+        console.debug('🎤 [클라이언트] 녹음기 재시작...');
+        // localStreamRef.current가 null이 아니라면 (즉, 스트리밍 중이라면) 즉시 다시 시작
         if (localStreamRef.current) { 
-          console.log('🎤 5초 녹음 완료, 다음 5초 녹음 시작...');
-          recorder.start(5000); // 다음 10초 녹음 시작
+          mediaRecorderRef.current.start(5000); // 다음 5초 녹음 시작 (원래 5초였음)
         } else {
           console.log('🎤 녹음 루프 정지 (스트림 종료됨)');
         }
       };
       // --- 👆 여기까지 수정 ---
 
-      recorder.start(5000); // 5초마다 데이터 수집 시작
+      recorder.start(5000); // 5초마다 데이터 수집 시작 (원래 5초였음)
       console.log('🎤 음성 녹음 시작 (5초 간격)');
     } catch (error) {
       console.error(`❌ 음성 캡처 실패: ${error.message}`);
@@ -238,7 +248,6 @@ function RecordingPage() {
       
       // getVoices()를 호출하면 음성 목록 로드를 트리거할 수 있습니다.
       const voices = window.speechSynthesis.getVoices(); 
-
       const speakDummy = () => {
         // TTS API가 활성화되었는지 확인
         if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
