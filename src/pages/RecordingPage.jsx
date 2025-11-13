@@ -45,7 +45,7 @@ function RecordingPage() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  // --- 3. [수정됨] 모든 스트림과 연결을 중지하는 함수 ---
+  // --- [수정됨] 1. 세션 종료 버그 해결 ---
   const stopAllStreams = useCallback(() => {
     console.log('--- 🛑 모든 스트림과 연결을 중지합니다 ---');
 
@@ -74,7 +74,7 @@ function RecordingPage() {
       if (sessionIdRef.current) {
         console.log(`[Socket] 'stop-video-stream' 이벤트 전송: sessionId=${sessionIdRef.current}, userId=${userId}`);
         
-        // DTO 규격에 맞게 'reason' 필드 포함 (Optional)
+        // DTO에 'reason'이 Optional이므로 포함
         socketRef.current.emit('stop-video-stream', { 
           sessionId: sessionIdRef.current, 
           userId: userId,
@@ -82,11 +82,11 @@ function RecordingPage() {
         });
       }
       
-      // --- ✅ [핵심 수정] ---
-      // ❗️ emit() 직후 disconnect()를 호출하면 서버가 메시지를 받지 못하므로 제거합니다.
-      // ❗️ 연결 종료는 useEffect의 cleanup 함수 또는 서버의 handleDisconnect가 처리합니다.
+      // --- ❗️ [핵심 수정] ❗️ ---
+      // ❗️ emit() 메시지가 전송될 시간을 주기 위해 이 두 줄을 반드시 제거(주석 처리)해야 합니다.
       // socketRef.current.disconnect(); 
       // socketRef.current = null;
+      // ---
     }
     sessionIdRef.current = null;
   }, [userId]); // userId 의존성 추가
@@ -232,7 +232,7 @@ function RecordingPage() {
     };
   }, [isAvatarSpeaking]);
 
-  // --- 7. 페이지 로드 useEffect (STT 수정) ---
+  // --- 7. [수정됨] 페이지 로드 useEffect (STT 오류 해결) ---
   useEffect(() => {
     const unlockAudioContext = () => {
       const voices = window.speechSynthesis.getVoices(); 
@@ -261,6 +261,7 @@ function RecordingPage() {
         if(data.sessionId) sessionIdRef.current = data.sessionId;
       });
 
+      // (실시간 일기/조언 리스너)
       let diaryTextBuffer = '';
       socketRef.current.on('diary-stream-start', () => {
         diaryTextBuffer = '';
@@ -291,8 +292,6 @@ function RecordingPage() {
       
       socketRef.current.on('final-diary', (data) => {
          console.log('📗 [ON] final-diary (일기 생성 완료 신호)', data);
-         // (참고) UI를 바꾸지 않기 위해 이 데이터는 사용하지 않지만,
-         // 서버가 완료했음을 확인하는 로그입니다.
       });
 
       socketRef.current.on('video-stream-error', (err) => console.error('❌ [ON] video-stream-error', err));
@@ -300,23 +299,27 @@ function RecordingPage() {
       socketRef.current.on('exception', (err) => console.error('❌ [ON] exception (서버 오류)', err));
 
       try {
-        // --- ✅ [핵심 수정] ---
+        // --- ❗️ [핵심 수정] ❗️ ---
+        // ❗️ 오디오 샘플링 속도를 48000Hz로 강제합니다.
         const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { width: 640, height: 480 },
           audio: {
-            sampleRate: 48000, // ❗️ Google STT Opus 코덱이 지원하는 값으로 지정
-            channelCount: 1,  // ❗️ 모노 채널로 지정 (권장)
+            sampleRate: 48000, 
+            channelCount: 1,
           }
         });
 
+        // ❗️ 실제 적용된 설정 확인용 로그
         const audioSettings = stream.getAudioTracks()[0].getSettings();
-        console.log('🎤 실제 적용된 오디오 설정:', audioSettings);
+        console.log('🎤 실제 적용된 오디오 설정:', audioSettings); 
 
         unlockAudioContext();
         localStreamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
+        
         startFrameCapture();
         setupAudioCapture();
+
       } catch (error) {
         console.error('❌ 미디어 접근 실패:', error);
         alert('카메라/마이크 접근에 실패했습니다.');
@@ -327,7 +330,7 @@ function RecordingPage() {
 
     return () => {
       // 컴포넌트가 사라질 때 (페이지 이동 시) 실행되는 정리 함수
-      stopAllStreams();
+      stopAllStreams(); // ❗️ 버그가 수정된 stopAllStreams 호출
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
